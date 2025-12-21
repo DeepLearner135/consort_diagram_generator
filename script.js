@@ -41,8 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalExcludedInput = document.getElementById('total-excluded');
     const armCountSelect = document.getElementById('arm-count');
     const diagramContainer = document.getElementById('diagram-container');
-    const printBtn = document.getElementById('print-btn');
     const exportSvgBtn = document.getElementById('export-svg-btn');
+    const exportPngBtn = document.getElementById('export-png-btn');
+    const exportJpgBtn = document.getElementById('export-jpg-btn');
     const themeSelect = document.getElementById('theme-select');
 
     // Init
@@ -50,10 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!assessedInput) return;
         setupSidebarExtras();
         renderControls();
-
-        // Critical: Apply theme so boxes are visible
         applyTheme(state.theme);
-
         renderDiagram();
         bindEvents();
     }
@@ -148,7 +146,23 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        printBtn.addEventListener('click', () => window.print());
+
+
+        // Listen for browser print events as fallback
+        window.addEventListener('beforeprint', () => {
+            renderDiagram();
+        });
+        window.addEventListener('afterprint', () => {
+            // Optional: restore if needed, but the diagram is responsive so it's fine
+            setTimeout(renderDiagram, 100);
+        });
+
+        // Resize Listener
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(renderDiagram, 100);
+        });
 
         if (exportSvgBtn) {
             exportSvgBtn.addEventListener('click', () => {
@@ -156,7 +170,17 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Removed PNG support as requested
+        if (exportPngBtn) {
+            exportPngBtn.addEventListener('click', () => {
+                downloadImage('png');
+            });
+        }
+
+        if (exportJpgBtn) {
+            exportJpgBtn.addEventListener('click', () => {
+                downloadImage('jpg');
+            });
+        }
     }
 
     function applyTheme(theme) {
@@ -426,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const h = diagramContainer.scrollHeight;
             svgCanvas.style.height = (h + 50) + "px";
 
-        }, 150);
+        }, 100);
     }
 
     function createBox(title, content, isHtml = false) {
@@ -455,6 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- EXPORT LOGIC ---
     function downloadSvg() {
+        // Clone and serialize
         const w = diagramContainer.scrollWidth + 50;
         const h = diagramContainer.scrollHeight + 50;
 
@@ -465,7 +490,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Embed styles
         const style = document.createElement("style");
-        // We include minified necessary styles
         style.textContent = `
             .dia-box { border: 2px solid black; background: white; padding: 10px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; }
             .dia-label { font-weight: bold; margin-bottom: 5px; }
@@ -487,7 +511,6 @@ document.addEventListener('DOMContentLoaded', () => {
         htmlWrap.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
         if (state.theme) htmlWrap.className = `theme-${state.theme}`;
 
-        // Clone content
         const mainFlow = diagramContainer.querySelector('.main-flow');
         if (mainFlow) {
             htmlWrap.appendChild(mainFlow.cloneNode(true));
@@ -496,7 +519,6 @@ document.addEventListener('DOMContentLoaded', () => {
         foreignObj.appendChild(htmlWrap);
         exportSvg.appendChild(foreignObj);
 
-        // Copy lines
         const originalSvg = diagramContainer.querySelector('svg');
         if (originalSvg) {
             const linesGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -515,6 +537,29 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    }
+
+    function downloadImage(format) {
+        if (!window.html2canvas) {
+            alert("html2canvas library not loaded. Please ensure you have internet access for the CDN.");
+            return;
+        }
+
+        // Calculate appropriate scale
+        html2canvas(diagramContainer, {
+            backgroundColor: (state.theme === 'dark' ? '#1e293b' : '#ffffff'),
+            scale: 2
+        }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = `consort-diagram.${format}`;
+            link.href = canvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }).catch(err => {
+            console.error("Image export failed:", err);
+            alert("Image export failed. Please check console.");
+        });
     }
 
     init();

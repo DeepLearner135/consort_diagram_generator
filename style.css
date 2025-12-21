@@ -174,10 +174,55 @@ body {
 .btn-secondary {
     width: 100%;
     padding: 0.5rem;
-    border: 1px dashed var(--border-color);
-    background: white;
+    border: 1px solid var(--border-color);
+    background: #f1f5f9;
+    color: #475569;
     cursor: pointer;
     border-radius: 4px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+    color: #1e293b;
+}
+
+#export-svg-btn {
+    background-color: #fff7ed;
+    /* Light Orange */
+    border-color: #ffedd5;
+    color: #c2410c;
+}
+
+#export-svg-btn:hover {
+    background-color: #ffedd5;
+    border-color: #fed7aa;
+}
+
+#export-png-btn {
+    background-color: #eff6ff;
+    /* Light Blue */
+    border-color: #dbeafe;
+    color: #1d4ed8;
+}
+
+#export-png-btn:hover {
+    background-color: #dbeafe;
+    border-color: #bfdbfe;
+}
+
+#export-jpg-btn {
+    background-color: #f0fdf4;
+    /* Light Green */
+    border-color: #dcfce7;
+    color: #15803d;
+}
+
+#export-jpg-btn:hover {
+    background-color: #dcfce7;
+    border-color: #bbf7d0;
 }
 
 .btn-primary {

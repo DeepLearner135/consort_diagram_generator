@@ -66,10 +66,10 @@
                 </section>
 
                 <div class="actions">
-                    <button id="print-btn" class="btn-primary mb-2">Print / PDF</button>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button id="export-svg-btn" class="btn-secondary">Export SVG</button>
-                        <button id="export-png-btn" class="btn-secondary">Export PNG</button>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <button id="export-svg-btn" class="btn-secondary">Export to SVG</button>
+                        <button id="export-png-btn" class="btn-secondary">Export to PNG</button>
+                        <button id="export-jpg-btn" class="btn-secondary">Export to JPG</button>
                     </div>
                 </div>
             </div>
@@ -81,6 +81,7 @@
             </div>
         </main>
     </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="script.js"></script>
 </body>
 
