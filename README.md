@@ -1,6 +1,7 @@
 # Consort Diagram Generator
 
 A web-based tool for generating publication-ready CONSORT (Consolidated Standards of Reporting Trials) flow diagrams for clinical trials.
+This tool is under active development. While usable, outputs should be reviewed for accuracy before publication.
 
 ## Features
 
