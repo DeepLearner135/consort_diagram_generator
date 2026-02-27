@@ -23,10 +23,10 @@ A web-based tool for generating publication-ready CONSORT (Consolidated Standard
 2.  **Enter Enrollment Data**: Input the total number assessed for eligibility.
 3.  **Add Exclusions**: Click "+ Add Exclusion Reason" to detail why participants were excluded.
 4.  **Define Arms**: Select the number of study groups (arms) and the diagram will update automatically.
-5.  **Edit Text**: If you need to change a specific label (e.g., "Analysed" to "Included in Analysis"), simply click on the text in the diagram and type.
+5.  **Edit Text**: If you need to change a specific label (e.g., "Analysed" to "Included in Analysis"), simply click on the text in the diagram and type. NOTE: Custom text will refresh if settings are changed after this step and must be re-entered.
 6.  **Export**: Use the colored buttons in the sidebar to download your diagram.
 
-## technical Details
+## Technical Details
 
 -   Build with pure **HTML, CSS, and JavaScript**.
 -   Uses **SVG** for precise arrow rendering.
