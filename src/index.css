@@ -346,6 +346,83 @@ button:contains("PNG"):hover {
     color: #93c5fd;
 }
 
+/* Minimalist Theme */
+.theme-minimalist .consort-diagram {
+    background: #ffffff;
+    font-family: 'Inter', sans-serif;
+    box-shadow: none;
+}
+
+.theme-minimalist .dia-box {
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #111827;
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: none;
+}
+
+.theme-minimalist .dia-label {
+    color: #6b7280;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.75rem;
+    border-bottom: none;
+}
+
+/* Pastel Theme */
+.theme-pastel .consort-diagram {
+    background: #fffafa;
+    /* Very light pinkish back */
+    font-family: 'Playfair Display', serif;
+}
+
+.theme-pastel .dia-box {
+    border: none;
+    background: #fdf2f8;
+    /* Soft pink */
+    color: #4c1d95;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 25px rgba(236, 72, 153, 0.15);
+}
+
+.theme-pastel .dia-label {
+    color: #db2777;
+    font-style: italic;
+    font-size: 1rem;
+    border-bottom: none;
+}
+
+/* Emerald Brutalism Theme */
+.theme-emerald .consort-diagram {
+    background: #f0fdf4;
+    font-family: 'Inter', monospace;
+    box-shadow: 8px 8px 0px #064e3b;
+    border: 4px solid #064e3b;
+}
+
+.theme-emerald .dia-box {
+    border: 3px solid #064e3b;
+    background: #10b981;
+    color: #ffffff;
+    border-radius: 0;
+    box-shadow: 6px 6px 0px #064e3b;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.theme-emerald .dia-box:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 4px 4px 0px #064e3b;
+}
+
+.theme-emerald .dia-label {
+    color: #ecfdf5;
+    font-weight: 800;
+    text-transform: uppercase;
+    border-bottom: 2px solid #059669;
+}
+
 /* Box Styling */
 .dia-box {
     padding: 1rem 1.25rem;
@@ -369,6 +446,10 @@ button:contains("PNG"):hover {
 .dia-label:focus,
 .dia-count:focus {
     border-bottom: 1px dashed #cbd5e1;
+}
+
+.dia-label:empty {
+    display: none;
 }
 
 .dia-count {

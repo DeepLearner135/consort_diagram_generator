@@ -29,7 +29,7 @@ export const DiagramBox = ({
 
     return (
         <div id={id} className={`dia-box ${className}`} style={style}>
-            {title !== undefined && title !== null && (
+            {title !== undefined && title !== null && title !== "" && (
                 <div
                     className="dia-label"
                     contentEditable

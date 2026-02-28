@@ -17430,35 +17430,66 @@ const Sidebar = ({
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "control-group", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Excluded" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { id: "exclusion-list", children: exclusions.map((ex) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "exclusion-item", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
-            {
-              type: "text",
-              value: ex.reason,
-              placeholder: "Reason",
-              onChange: (e) => updateExclusion(ex.id, "reason", e.target.value)
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
-            {
-              type: "number",
-              value: ex.count,
-              placeholder: "0",
-              onChange: (e) => updateExclusion(ex.id, "count", parseInt(e.target.value) || 0)
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              className: "del-btn",
-              title: "Remove",
-              onClick: () => removeExclusion(ex.id),
-              children: "×"
-            }
-          )
-        ] }, ex.id)) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { id: "exclusion-list", children: [
+          exclusions.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "exclusion-header exclusion-item", style: { gridTemplateColumns: "1fr 80px 80px 32px", marginBottom: "0.25rem", paddingBottom: "0.25rem", borderBottom: "1px solid var(--border-color)" }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: "0.75rem", color: "var(--text-secondary)" }, children: "Reason" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: "0.75rem", color: "var(--text-secondary)", textAlign: "center" }, children: "Excluded" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: "0.75rem", color: "var(--text-secondary)", textAlign: "center" }, children: "Remaining" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", {})
+          ] }),
+          (() => {
+            let currentRemaining = parseInt(enrollment.count) || 0;
+            return exclusions.map((ex) => {
+              const remainingBeforeThis = currentRemaining;
+              const remainingAfterThis = currentRemaining - (parseInt(ex.count) || 0);
+              currentRemaining = remainingAfterThis;
+              return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "exclusion-item", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "input",
+                  {
+                    type: "text",
+                    value: ex.reason,
+                    placeholder: "Reason",
+                    onChange: (e) => updateExclusion(ex.id, "reason", e.target.value)
+                  }
+                ),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "input",
+                  {
+                    type: "number",
+                    value: ex.count,
+                    placeholder: "0",
+                    title: `Number Excluded (Remaining before this step: ${remainingBeforeThis})`,
+                    onChange: (e) => updateExclusion(ex.id, "count", parseInt(e.target.value) || 0)
+                  }
+                ),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "input",
+                  {
+                    type: "number",
+                    value: remainingAfterThis,
+                    placeholder: "0",
+                    title: "Remaining after this exclusion",
+                    onChange: (e) => {
+                      const newRemaining = parseInt(e.target.value) || 0;
+                      const newExcluded = remainingBeforeThis - newRemaining;
+                      updateExclusion(ex.id, "count", Math.max(0, newExcluded));
+                    }
+                  }
+                ),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "button",
+                  {
+                    className: "del-btn",
+                    title: "Remove",
+                    onClick: () => removeExclusion(ex.id),
+                    children: "×"
+                  }
+                )
+              ] }, ex.id);
+            });
+          })()
+        ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary", onClick: addExclusion, children: "+ Add Exclusion Reason" }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "input-field", style: { marginTop: "1rem" }, children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("label", { children: "Total Excluded (Auto-calc)" }),
@@ -17496,7 +17527,10 @@ const Sidebar = ({
           /* @__PURE__ */ jsxRuntimeExports.jsxs("select", { value: theme, onChange: (e) => updateState({ theme: e.target.value }), children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "classic", children: "Scientific (Classic)" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "modern", children: "Modern Blue" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "dark", children: "Dark Mode" })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "dark", children: "Dark Mode" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "minimalist", children: "Minimalist" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "pastel", children: "Pastel Pink" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "emerald", children: "Emerald Brutalism" })
           ] })
         ] })
       ] }),
@@ -17537,7 +17571,7 @@ const DiagramBox = ({
     }
   };
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { id, className: `dia-box ${className}`, style, children: [
-    title !== void 0 && title !== null && /* @__PURE__ */ jsxRuntimeExports.jsx(
+    title !== void 0 && title !== null && title !== "" && /* @__PURE__ */ jsxRuntimeExports.jsx(
       "div",
       {
         className: "dia-label",
@@ -17653,7 +17687,11 @@ const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) => {
   const renderText = (id, key, defaultVal) => {
     return textOverrides[id]?.[key] !== void 0 ? textOverrides[id][key] : defaultVal;
   };
-  const arrowColor = state.theme === "dark" ? "#f1f5f9" : "black";
+  let arrowColor = "black";
+  if (state.theme === "dark") arrowColor = "#f1f5f9";
+  if (state.theme === "pastel") arrowColor = "#db2777";
+  if (state.theme === "emerald") arrowColor = "#064e3b";
+  if (state.theme === "minimalist") arrowColor = "#9ca3af";
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "diagram-wrapper", style: { position: "relative", width: "100%", height: "100%" }, children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "svg",
@@ -25928,7 +25966,7 @@ select:focus {
 
 .exclusion-item {
     display: grid;
-    grid-template-columns: 1fr 80px 32px;
+    grid-template-columns: 1fr 80px 80px 32px;
     gap: 0.5rem;
     margin-bottom: 0.5rem;
     align-items: center;
@@ -26142,6 +26180,86 @@ button:contains("PNG"):hover {
     color: #93c5fd;
 }
 
+/* Minimalist Theme */
+
+.theme-minimalist .consort-diagram {
+    background: #ffffff;
+    font-family: 'Inter', sans-serif;
+    box-shadow: none;
+}
+
+.theme-minimalist .dia-box {
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #111827;
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: none;
+}
+
+.theme-minimalist .dia-label {
+    color: #6b7280;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.75rem;
+    border-bottom: none;
+}
+
+/* Pastel Theme */
+
+.theme-pastel .consort-diagram {
+    background: #fffafa;
+    /* Very light pinkish back */
+    font-family: 'Playfair Display', serif;
+}
+
+.theme-pastel .dia-box {
+    border: none;
+    background: #fdf2f8;
+    /* Soft pink */
+    color: #4c1d95;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 25px rgba(236, 72, 153, 0.15);
+}
+
+.theme-pastel .dia-label {
+    color: #db2777;
+    font-style: italic;
+    font-size: 1rem;
+    border-bottom: none;
+}
+
+/* Emerald Brutalism Theme */
+
+.theme-emerald .consort-diagram {
+    background: #f0fdf4;
+    font-family: 'Inter', monospace;
+    box-shadow: 8px 8px 0px #064e3b;
+    border: 4px solid #064e3b;
+}
+
+.theme-emerald .dia-box {
+    border: 3px solid #064e3b;
+    background: #10b981;
+    color: #ffffff;
+    border-radius: 0;
+    box-shadow: 6px 6px 0px #064e3b;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.theme-emerald .dia-box:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 4px 4px 0px #064e3b;
+}
+
+.theme-emerald .dia-label {
+    color: #ecfdf5;
+    font-weight: 800;
+    text-transform: uppercase;
+    border-bottom: 2px solid #059669;
+}
+
 /* Box Styling */
 
 .dia-box {
@@ -26166,6 +26284,10 @@ button:contains("PNG"):hover {
 .dia-label:focus,
 .dia-count:focus {
     border-bottom: 1px dashed #cbd5e1;
+}
+
+.dia-label:empty {
+    display: none;
 }
 
 .dia-count {

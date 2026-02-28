@@ -187,6 +187,9 @@ export const Sidebar = ({
                             <option value="classic">Scientific (Classic)</option>
                             <option value="modern">Modern Blue</option>
                             <option value="dark">Dark Mode</option>
+                            <option value="minimalist">Minimalist</option>
+                            <option value="pastel">Pastel Pink</option>
+                            <option value="emerald">Emerald Brutalism</option>
                         </select>
                     </div>
                 </section>

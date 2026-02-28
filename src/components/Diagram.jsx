@@ -114,7 +114,11 @@ export const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) 
         return textOverrides[id]?.[key] !== undefined ? textOverrides[id][key] : defaultVal;
     };
 
-    const arrowColor = state.theme === 'dark' ? '#f1f5f9' : 'black';
+    let arrowColor = 'black';
+    if (state.theme === 'dark') arrowColor = '#f1f5f9';
+    if (state.theme === 'pastel') arrowColor = '#db2777';
+    if (state.theme === 'emerald') arrowColor = '#064e3b';
+    if (state.theme === 'minimalist') arrowColor = '#9ca3af';
 
     return (
         <div className="diagram-wrapper" style={{ position: 'relative', width: '100%', height: '100%' }}>
