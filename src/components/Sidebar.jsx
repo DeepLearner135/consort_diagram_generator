@@ -91,29 +91,58 @@ export const Sidebar = ({
                 <section className="control-group">
                     <h2>Excluded</h2>
                     <div id="exclusion-list">
-                        {exclusions.map((ex) => (
-                            <div key={ex.id} className="exclusion-item">
-                                <input
-                                    type="text"
-                                    value={ex.reason}
-                                    placeholder="Reason"
-                                    onChange={(e) => updateExclusion(ex.id, 'reason', e.target.value)}
-                                />
-                                <input
-                                    type="number"
-                                    value={ex.count}
-                                    placeholder="0"
-                                    onChange={(e) => updateExclusion(ex.id, 'count', parseInt(e.target.value) || 0)}
-                                />
-                                <button
-                                    className="del-btn"
-                                    title="Remove"
-                                    onClick={() => removeExclusion(ex.id)}
-                                >
-                                    ×
-                                </button>
+                        {exclusions.length > 0 && (
+                            <div className="exclusion-header exclusion-item" style={{ gridTemplateColumns: '1fr 80px 80px 32px', marginBottom: '0.25rem', paddingBottom: '0.25rem', borderBottom: '1px solid var(--border-color)' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Reason</span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center' }}>Excluded</span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center' }}>Remaining</span>
+                                <span></span>
                             </div>
-                        ))}
+                        )}
+                        {(() => {
+                            let currentRemaining = parseInt(enrollment.count) || 0;
+                            return exclusions.map((ex) => {
+                                const remainingBeforeThis = currentRemaining;
+                                const remainingAfterThis = currentRemaining - (parseInt(ex.count) || 0);
+                                currentRemaining = remainingAfterThis;
+
+                                return (
+                                    <div key={ex.id} className="exclusion-item">
+                                        <input
+                                            type="text"
+                                            value={ex.reason}
+                                            placeholder="Reason"
+                                            onChange={(e) => updateExclusion(ex.id, 'reason', e.target.value)}
+                                        />
+                                        <input
+                                            type="number"
+                                            value={ex.count}
+                                            placeholder="0"
+                                            title={`Number Excluded (Remaining before this step: ${remainingBeforeThis})`}
+                                            onChange={(e) => updateExclusion(ex.id, 'count', parseInt(e.target.value) || 0)}
+                                        />
+                                        <input
+                                            type="number"
+                                            value={remainingAfterThis}
+                                            placeholder="0"
+                                            title="Remaining after this exclusion"
+                                            onChange={(e) => {
+                                                const newRemaining = parseInt(e.target.value) || 0;
+                                                const newExcluded = remainingBeforeThis - newRemaining;
+                                                updateExclusion(ex.id, 'count', Math.max(0, newExcluded));
+                                            }}
+                                        />
+                                        <button
+                                            className="del-btn"
+                                            title="Remove"
+                                            onClick={() => removeExclusion(ex.id)}
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                );
+                            });
+                        })()}
                     </div>
                     <button className="btn-secondary" onClick={addExclusion}>
                         + Add Exclusion Reason
