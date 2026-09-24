@@ -1,6 +1,6 @@
 import html2canvas from 'html2canvas';
 
-export const downloadSvg = (diagramContainer, theme) => {
+export const downloadSvg = (diagramContainer, theme, font) => {
     if (!diagramContainer) return;
 
     const w = diagramContainer.scrollWidth + 50;
@@ -11,8 +11,13 @@ export const downloadSvg = (diagramContainer, theme) => {
     exportSvg.setAttribute("height", h);
     exportSvg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
 
+    const fontStyle = font && font !== 'default'
+        ? `.dia-box, .dia-label, .dia-count, .consort-diagram { font-family: ${font} !important; }`
+        : '';
+
     const style = document.createElement("style");
     style.textContent = `
+        @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Merriweather:wght@400;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Roboto:wght@400;500;700&display=swap');
         .dia-box { border: 2px solid black; background: white; padding: 10px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; }
         .dia-label { font-weight: bold; margin-bottom: 5px; outline: none; border-bottom: 1px dashed transparent; }
         .theme-modern .dia-box { border: 1px solid #cbd5e1; border-left: 4px solid #2563eb; border-radius: 8px; font-family: 'Inter', sans-serif; background: white; color: #334155; }
@@ -25,6 +30,7 @@ export const downloadSvg = (diagramContainer, theme) => {
         .theme-modern .dia-label { color: #2563eb; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }
         .theme-dark .dia-label { color: #93c5fd; }
         .theme-dark .dia-count { color: #e2e8f0; }
+        ${fontStyle}
     `;
     exportSvg.appendChild(style);
 

@@ -1,5 +1,6 @@
 import React, { useLayoutEffect, useRef, useState, useEffect } from 'react';
 import { DiagramBox } from './DiagramBox';
+import { formatNumber } from '../utils/formatUtils';
 
 export const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) => {
     const [lines, setLines] = useState([]);
@@ -103,6 +104,10 @@ export const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) 
         // Small delay to ensure flex layouts settle
         const timeoutId = setTimeout(drawConnections, 50);
 
+        if (document.fonts) {
+            document.fonts.ready.then(drawConnections);
+        }
+
         window.addEventListener('resize', drawConnections);
         return () => {
             clearTimeout(timeoutId);
@@ -156,7 +161,7 @@ export const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) 
                     <DiagramBox
                         id="enrollment-box"
                         title={renderText('enrollment-box', 'title', state.enrollment.label)}
-                        content={renderText('enrollment-box', 'content', `(n=${initialCount})`)}
+                        content={renderText('enrollment-box', 'content', `(n=${formatNumber(initialCount)})`)}
                         onTextChange={onOverrideText}
                     />
                 </div>
@@ -168,7 +173,7 @@ export const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) 
                             id={`exclusion-${ex.id}`}
                             isHtml={true}
                             title={renderText(`exclusion-${ex.id}`, 'title', "")}
-                            content={renderText(`exclusion-${ex.id}`, 'content', `${ex.reason} (n=${ex.count})`)}
+                            content={renderText(`exclusion-${ex.id}`, 'content', `${ex.reason} (n=${formatNumber(ex.count)})`)}
                             onTextChange={onOverrideText}
                             style={{
                                 position: 'absolute', top: '50%', transform: 'translateY(-50%)',
@@ -183,7 +188,7 @@ export const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) 
                 <DiagramBox
                     id="randomized-box"
                     title={renderText('randomized-box', 'title', state.randomizedLabel)}
-                    content={renderText('randomized-box', 'content', `(n=${randomizedCount})`)}
+                    content={renderText('randomized-box', 'content', `(n=${formatNumber(randomizedCount)})`)}
                     onTextChange={onOverrideText}
                 />
 
@@ -196,7 +201,7 @@ export const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) 
                                 <DiagramBox
                                     id={`arm-${arm.id}`}
                                     title={renderText(`arm-${arm.id}`, 'title', arm.label)}
-                                    content={renderText(`arm-${arm.id}`, 'content', `(n=${count})`)}
+                                    content={renderText(`arm-${arm.id}`, 'content', `(n=${formatNumber(count)})`)}
                                     onTextChange={onOverrideText}
                                 />
 
@@ -212,7 +217,7 @@ export const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) 
                                         <DiagramBox
                                             id={`analysis-${arm.id}`}
                                             title={renderText(`analysis-${arm.id}`, 'title', state.analysis.label)}
-                                            content={renderText(`analysis-${arm.id}`, 'content', `${state.analysis.analysedLabel} (n=${count})`)}
+                                            content={renderText(`analysis-${arm.id}`, 'content', `${state.analysis.analysedLabel} (n=${formatNumber(count)})`)}
                                             onTextChange={onOverrideText}
                                         />
                                     </>

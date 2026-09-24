@@ -1,4 +1,6 @@
 import React, { useRef } from 'react';
+import { formatNumber } from '../utils/formatUtils';
+import { FONT_OPTIONS } from '../utils/fontUtils';
 
 export const Sidebar = ({
     state,
@@ -118,7 +120,7 @@ export const Sidebar = ({
                                             type="number"
                                             value={ex.count}
                                             placeholder="0"
-                                            title={`Number Excluded (Remaining before this step: ${remainingBeforeThis})`}
+                                            title={`Number Excluded (Remaining before this step: ${formatNumber(remainingBeforeThis)})`}
                                             onChange={(e) => updateExclusion(ex.id, 'count', parseInt(e.target.value) || 0)}
                                         />
                                         <input
@@ -150,7 +152,7 @@ export const Sidebar = ({
 
                     <div className="input-field" style={{ marginTop: '1rem' }}>
                         <label>Total Excluded (Auto-calc)</label>
-                        <input type="number" readOnly value={totalExcluded} />
+                        <input type="text" readOnly value={formatNumber(totalExcluded)} />
                     </div>
                 </section>
 
@@ -190,6 +192,27 @@ export const Sidebar = ({
                             <option value="minimalist">Minimalist</option>
                             <option value="pastel">Pastel Pink</option>
                             <option value="emerald">Emerald Brutalism</option>
+                        </select>
+                    </div>
+
+                    <div className="input-field" style={{ marginTop: '0.75rem' }}>
+                        <label>Font Family</label>
+                        <select
+                            value={state.font || 'default'}
+                            onChange={(e) => updateState({ font: e.target.value })}
+                        >
+                            {FONT_OPTIONS.map((item) => {
+                                if (item.category && item.options) {
+                                    return (
+                                        <optgroup key={item.category} label={item.category}>
+                                            {item.options.map(opt => (
+                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            ))}
+                                        </optgroup>
+                                    );
+                                }
+                                return <option key={item.value} value={item.value}>{item.label}</option>;
+                            })}
                         </select>
                     </div>
                 </section>

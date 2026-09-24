@@ -5,6 +5,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Consort Diagram Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Merriweather:wght@400;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <script type="module">true              &&(function polyfill() {
 	const relList = document.createElement("link").relList;
 	if (relList && relList.supports && relList.supports("modulepreload")) return;
@@ -17348,6 +17351,52 @@ function requireClient () {
 var clientExports = requireClient();
 const ReactDOM = /*@__PURE__*/getDefaultExportFromCjs(clientExports);
 
+/**
+ * Formats a number with commas for readability (e.g. 1000 -> 1,000).
+ * Handles numbers, numeric strings, and edge cases gracefully.
+ *
+ * @param {number|string} val - The number or numeric string to format
+ * @returns {string} Number formatted with commas
+ */
+const formatNumber = (val) => {
+    if (val === null || val === undefined || val === '') return '0';
+    const cleanStr = String(val).replace(/,/g, '').trim();
+    const num = Number(cleanStr);
+    if (isNaN(num)) return String(val);
+    return num.toLocaleString('en-US');
+};
+
+const FONT_OPTIONS = [
+    { value: 'default', label: 'Theme Default' },
+    {
+        category: 'Sans-Serif',
+        options: [
+            { value: "'Inter', system-ui, -apple-system, sans-serif", label: 'Inter (Modern Sans)' },
+            { value: "'Roboto', sans-serif", label: 'Roboto' },
+            { value: "'Open Sans', sans-serif", label: 'Open Sans' },
+            { value: "Arial, Helvetica, sans-serif", label: 'Arial / Helvetica' },
+            { value: "'Segoe UI', system-ui, sans-serif", label: 'Segoe UI (System)' }
+        ]
+    },
+    {
+        category: 'Serif (Publication & Medical)',
+        options: [
+            { value: "'Times New Roman', Times, serif", label: 'Times New Roman (Academic)' },
+            { value: "Georgia, serif", label: 'Georgia' },
+            { value: "'EB Garamond', Garamond, serif", label: 'EB Garamond' },
+            { value: "'Playfair Display', serif", label: 'Playfair Display' },
+            { value: "'Merriweather', serif", label: 'Merriweather' }
+        ]
+    },
+    {
+        category: 'Monospace',
+        options: [
+            { value: "'Courier New', Courier, monospace", label: 'Courier New' },
+            { value: "'JetBrains Mono', Consolas, monospace", label: 'JetBrains Mono' }
+        ]
+    }
+];
+
 const Sidebar = ({
   state,
   updateState,
@@ -17459,7 +17508,7 @@ const Sidebar = ({
                     type: "number",
                     value: ex.count,
                     placeholder: "0",
-                    title: `Number Excluded (Remaining before this step: ${remainingBeforeThis})`,
+                    title: `Number Excluded (Remaining before this step: ${formatNumber(remainingBeforeThis)})`,
                     onChange: (e) => updateExclusion(ex.id, "count", parseInt(e.target.value) || 0)
                   }
                 ),
@@ -17493,7 +17542,7 @@ const Sidebar = ({
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary", onClick: addExclusion, children: "+ Add Exclusion Reason" }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "input-field", style: { marginTop: "1rem" }, children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("label", { children: "Total Excluded (Auto-calc)" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("input", { type: "number", readOnly: true, value: totalExcluded })
+          /* @__PURE__ */ jsxRuntimeExports.jsx("input", { type: "text", readOnly: true, value: formatNumber(totalExcluded) })
         ] })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "control-group", children: [
@@ -17532,6 +17581,22 @@ const Sidebar = ({
             /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "pastel", children: "Pastel Pink" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "emerald", children: "Emerald Brutalism" })
           ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "input-field", style: { marginTop: "0.75rem" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { children: "Font Family" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "select",
+            {
+              value: state.font || "default",
+              onChange: (e) => updateState({ font: e.target.value }),
+              children: FONT_OPTIONS.map((item) => {
+                if (item.category && item.options) {
+                  return /* @__PURE__ */ jsxRuntimeExports.jsx("optgroup", { label: item.category, children: item.options.map((opt) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: opt.value, children: opt.label }, opt.value)) }, item.category);
+                }
+                return /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: item.value, children: item.label }, item.value);
+              })
+            }
+          )
         ] })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "actions", style: { display: "flex", flexDirection: "column", gap: "0.5rem" }, children: [
@@ -17678,6 +17743,9 @@ const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) => {
       setLines(newLines);
     };
     const timeoutId = setTimeout(drawConnections, 50);
+    if (document.fonts) {
+      document.fonts.ready.then(drawConnections);
+    }
     window.addEventListener("resize", drawConnections);
     return () => {
       clearTimeout(timeoutId);
@@ -17730,7 +17798,7 @@ const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) => {
         {
           id: "enrollment-box",
           title: renderText("enrollment-box", "title", state.enrollment.label),
-          content: renderText("enrollment-box", "content", `(n=${initialCount})`),
+          content: renderText("enrollment-box", "content", `(n=${formatNumber(initialCount)})`),
           onTextChange: onOverrideText
         }
       ) }),
@@ -17740,7 +17808,7 @@ const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) => {
           id: `exclusion-${ex.id}`,
           isHtml: true,
           title: renderText(`exclusion-${ex.id}`, "title", ""),
-          content: renderText(`exclusion-${ex.id}`, "content", `${ex.reason} (n=${ex.count})`),
+          content: renderText(`exclusion-${ex.id}`, "content", `${ex.reason} (n=${formatNumber(ex.count)})`),
           onTextChange: onOverrideText,
           style: {
             position: "absolute",
@@ -17757,7 +17825,7 @@ const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) => {
         {
           id: "randomized-box",
           title: renderText("randomized-box", "title", state.randomizedLabel),
-          content: renderText("randomized-box", "content", `(n=${randomizedCount})`),
+          content: renderText("randomized-box", "content", `(n=${formatNumber(randomizedCount)})`),
           onTextChange: onOverrideText
         }
       ),
@@ -17769,7 +17837,7 @@ const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) => {
             {
               id: `arm-${arm.id}`,
               title: renderText(`arm-${arm.id}`, "title", arm.label),
-              content: renderText(`arm-${arm.id}`, "content", `(n=${count})`),
+              content: renderText(`arm-${arm.id}`, "content", `(n=${formatNumber(count)})`),
               onTextChange: onOverrideText
             }
           ),
@@ -17789,7 +17857,7 @@ const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) => {
               {
                 id: `analysis-${arm.id}`,
                 title: renderText(`analysis-${arm.id}`, "title", state.analysis.label),
-                content: renderText(`analysis-${arm.id}`, "content", `${state.analysis.analysedLabel} (n=${count})`),
+                content: renderText(`analysis-${arm.id}`, "content", `${state.analysis.analysedLabel} (n=${formatNumber(count)})`),
                 onTextChange: onOverrideText
               }
             )
@@ -25620,7 +25688,7 @@ var parseBackgroundColor = function (context, element, backgroundColorOverride) 
         : defaultBackgroundColor;
 };
 
-const downloadSvg = (diagramContainer, theme) => {
+const downloadSvg = (diagramContainer, theme, font) => {
     if (!diagramContainer) return;
 
     const w = diagramContainer.scrollWidth + 50;
@@ -25631,8 +25699,13 @@ const downloadSvg = (diagramContainer, theme) => {
     exportSvg.setAttribute("height", h);
     exportSvg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
 
+    const fontStyle = font && font !== 'default'
+        ? `.dia-box, .dia-label, .dia-count, .consort-diagram { font-family: ${font} !important; }`
+        : '';
+
     const style = document.createElement("style");
     style.textContent = `
+        @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Merriweather:wght@400;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Roboto:wght@400;500;700&display=swap');
         .dia-box { border: 2px solid black; background: white; padding: 10px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; }
         .dia-label { font-weight: bold; margin-bottom: 5px; outline: none; border-bottom: 1px dashed transparent; }
         .theme-modern .dia-box { border: 1px solid #cbd5e1; border-left: 4px solid #2563eb; border-radius: 8px; font-family: 'Inter', sans-serif; background: white; color: #334155; }
@@ -25645,6 +25718,7 @@ const downloadSvg = (diagramContainer, theme) => {
         .theme-modern .dia-label { color: #2563eb; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }
         .theme-dark .dia-label { color: #93c5fd; }
         .theme-dark .dia-count { color: #e2e8f0; }
+        ${fontStyle}
     `;
     exportSvg.appendChild(style);
 
@@ -25707,6 +25781,7 @@ const downloadImage = (diagramContainer, theme, format) => {
 
 const defaultState = {
   theme: "modern",
+  font: "default",
   showFollowUpAnalysis: true,
   enrollment: { label: "Assessed for eligibility", count: 135 },
   exclusionLabel: "Excluded",
@@ -25764,7 +25839,7 @@ function App() {
   };
   const handleExport = (format) => {
     if (format === "svg") {
-      downloadSvg(diagramRef.current, state.theme);
+      downloadSvg(diagramRef.current, state.theme, state.font);
     } else {
       downloadImage(diagramRef.current, state.theme, format);
     }
@@ -25809,22 +25884,31 @@ function App() {
         handleLoadState
       }
     ),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("main", { className: "preview-area", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: diagramRef, className: "consort-diagram", id: "diagram-container", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-      Diagram,
+    /* @__PURE__ */ jsxRuntimeExports.jsx("main", { className: "preview-area", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+      "div",
       {
-        state,
-        textOverrides,
-        onOverrideText: handleOverrideText,
-        containerRef: diagramRef
+        ref: diagramRef,
+        className: `consort-diagram ${state.font && state.font !== "default" ? "has-custom-font" : ""}`,
+        id: "diagram-container",
+        style: state.font && state.font !== "default" ? { "--custom-diagram-font": state.font, fontFamily: state.font } : {},
+        children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+          Diagram,
+          {
+            state,
+            textOverrides,
+            onOverrideText: handleOverrideText,
+            containerRef: diagramRef
+          }
+        )
       }
-    ) }) })
+    ) })
   ] }) });
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   /* @__PURE__ */ jsxRuntimeExports.jsx(React.StrictMode, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(App, {}) })
 );</script>
-  <style rel="stylesheet">@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
+  <style rel="stylesheet">@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Merriweather:wght@400;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Roboto:wght@400;500;700&display=swap');
 
 :root {
     --bg-color: #f1f5f9;
@@ -26077,6 +26161,15 @@ button:contains("PNG"):hover {
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
     transition: background 0.4s ease, color 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* Custom Font Overrides */
+
+.consort-diagram.has-custom-font,
+.consort-diagram.has-custom-font .dia-box,
+.consort-diagram.has-custom-font .dia-label,
+.consort-diagram.has-custom-font .dia-count {
+    font-family: var(--custom-diagram-font) !important;
 }
 
 /* THEMES */

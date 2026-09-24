@@ -6,6 +6,7 @@ import './index.css';
 
 const defaultState = {
     theme: 'modern',
+    font: 'default',
     showFollowUpAnalysis: true,
     enrollment: { label: "Assessed for eligibility", count: 135 },
     exclusionLabel: "Excluded",
@@ -73,7 +74,7 @@ function App() {
 
     const handleExport = (format) => {
         if (format === 'svg') {
-            downloadSvg(diagramRef.current, state.theme);
+            downloadSvg(diagramRef.current, state.theme, state.font);
         } else {
             downloadImage(diagramRef.current, state.theme, format);
         }
@@ -121,7 +122,12 @@ function App() {
                     handleLoadState={handleLoadState}
                 />
                 <main className="preview-area">
-                    <div ref={diagramRef} className="consort-diagram" id="diagram-container">
+                    <div
+                        ref={diagramRef}
+                        className={`consort-diagram ${state.font && state.font !== 'default' ? 'has-custom-font' : ''}`}
+                        id="diagram-container"
+                        style={state.font && state.font !== 'default' ? { '--custom-diagram-font': state.font, fontFamily: state.font } : {}}
+                    >
                         <Diagram
                             state={state}
                             textOverrides={textOverrides}
