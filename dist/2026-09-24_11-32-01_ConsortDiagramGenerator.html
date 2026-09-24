@@ -17397,48 +17397,160 @@ const FONT_OPTIONS = [
     }
 ];
 
+const GOOGLE_FONTS_URL = 'https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Merriweather:wght@400;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Roboto:wght@400;500;700&display=swap';
+
 const Sidebar = ({
   state,
   updateState,
   handleExport,
   handleSaveState,
-  handleLoadState
+  handleLoadState,
+  clearTextOverride
 }) => {
-  const { enrollment, exclusions, allocation, showFollowUpAnalysis, theme } = state;
+  const {
+    enrollment,
+    exclusions,
+    allocation,
+    showFollowUpAnalysis,
+    theme,
+    showCenterCohortBoxes,
+    exclusionLayout,
+    randomizedLabel
+  } = state;
   const fileInputRef = reactExports.useRef(null);
+  const [exportDpi, setExportDpi] = reactExports.useState("300");
+  const totalExcluded = exclusions.reduce((sum, ex) => sum + (parseInt(ex.count) || 0), 0);
+  const randomizedCount = Math.max(0, (parseInt(enrollment.count) || 0) - totalExcluded);
   const addExclusion = () => {
     updateState({
       exclusions: [
         ...exclusions,
-        { id: Date.now(), reason: "New Exclusion", count: 0 }
+        { id: Date.now(), reason: "New Exclusion", count: 0, cohortLabel: "" }
       ]
     });
   };
   const removeExclusion = (idToRemove) => {
-    updateState({
-      exclusions: exclusions.filter((ex) => ex.id !== idToRemove)
-    });
+    if (clearTextOverride) {
+      clearTextOverride(`exclusion-${idToRemove}`);
+      clearTextOverride(`cohort-step-${idToRemove}`);
+      clearTextOverride("randomized-box", "title");
+    }
+    const updatedExclusions = exclusions.filter((ex) => ex.id !== idToRemove);
+    const lastEx = updatedExclusions.length > 0 ? updatedExclusions[updatedExclusions.length - 1] : null;
+    if (lastEx && lastEx.cohortLabel) {
+      updateState({
+        exclusions: updatedExclusions,
+        randomizedLabel: lastEx.cohortLabel
+      });
+    } else {
+      updateState({
+        exclusions: updatedExclusions
+      });
+    }
   };
   const updateExclusion = (id, field, value) => {
-    updateState({
-      exclusions: exclusions.map(
-        (ex) => ex.id === id ? { ...ex, [field]: value } : ex
-      )
-    });
+    const isLastEx = exclusions.length > 0 && exclusions[exclusions.length - 1].id === id;
+    if (clearTextOverride) {
+      if (field === "reason" || field === "count") {
+        clearTextOverride(`exclusion-${id}`);
+      }
+      if (field === "cohortLabel") {
+        clearTextOverride(`cohort-step-${id}`);
+        if (isLastEx) {
+          clearTextOverride("randomized-box", "title");
+        }
+      }
+    }
+    if (field === "cohortLabel" && isLastEx) {
+      updateState({
+        randomizedLabel: value,
+        exclusions: exclusions.map(
+          (ex) => ex.id === id ? { ...ex, [field]: value } : ex
+        )
+      });
+    } else {
+      updateState({
+        exclusions: exclusions.map(
+          (ex) => ex.id === id ? { ...ex, [field]: value } : ex
+        )
+      });
+    }
   };
-  const totalExcluded = exclusions.reduce((sum, ex) => sum + (parseInt(ex.count) || 0), 0);
+  const handleEnrollmentLabelChange = (val) => {
+    if (clearTextOverride) clearTextOverride("enrollment-box", "title");
+    updateState({ enrollment: { ...enrollment, label: val } });
+  };
+  const handleEnrollmentCountChange = (val) => {
+    if (clearTextOverride) clearTextOverride("enrollment-box", "content");
+    updateState({ enrollment: { ...enrollment, count: parseInt(val) || 0 } });
+  };
+  const handleRandomizedLabelChange = (val) => {
+    if (clearTextOverride) clearTextOverride("randomized-box", "title");
+    const lastEx = exclusions.length > 0 ? exclusions[exclusions.length - 1] : null;
+    if (lastEx) {
+      if (clearTextOverride) clearTextOverride(`cohort-step-${lastEx.id}`, "title");
+      updateState({
+        randomizedLabel: val,
+        exclusions: exclusions.map(
+          (ex, i) => i === exclusions.length - 1 ? { ...ex, cohortLabel: val } : ex
+        )
+      });
+    } else {
+      updateState({ randomizedLabel: val });
+    }
+  };
   const handleArmCountChange = (e) => {
     const newCount = parseInt(e.target.value);
-    let newArmData = [...allocation.armData];
+    let newArmData = [...allocation.armData || []];
     if (newCount > newArmData.length) {
+      const defaultLabels = ["Allocated to intervention", "Allocated to control", "Allocated to Group 3", "Allocated to Group 4"];
       for (let i = newArmData.length; i < newCount; i++) {
-        newArmData.push({ id: Date.now() + i, label: `Group ${i + 1}`, count: 0 });
+        newArmData.push({
+          id: Date.now() + i,
+          label: defaultLabels[i] || `Group ${i + 1}`,
+          count: Math.floor(randomizedCount / (newCount || 1))
+        });
       }
     } else {
       newArmData = newArmData.slice(0, newCount);
     }
     updateState({
       allocation: { ...allocation, arms: newCount, armData: newArmData }
+    });
+  };
+  const updateArm = (id, field, value) => {
+    if (clearTextOverride) {
+      if (field === "label") clearTextOverride(`arm-${id}`, "title");
+      if (field === "count") {
+        clearTextOverride(`arm-${id}`, "content");
+        clearTextOverride(`analysis-${id}`, "content");
+      }
+    }
+    updateState({
+      allocation: {
+        ...allocation,
+        armData: allocation.armData.map(
+          (arm) => arm.id === id ? { ...arm, [field]: value } : arm
+        )
+      }
+    });
+  };
+  const handleAutoSplitArms = () => {
+    const numArms = allocation.arms || 1;
+    const baseCount = Math.floor(randomizedCount / numArms);
+    const remainder = randomizedCount % numArms;
+    const newArmData = allocation.armData.slice(0, numArms).map((arm, idx) => {
+      if (clearTextOverride) {
+        clearTextOverride(`arm-${arm.id}`, "content");
+        clearTextOverride(`analysis-${arm.id}`, "content");
+      }
+      return {
+        ...arm,
+        count: baseCount + (idx === 0 ? remainder : 0)
+      };
+    });
+    updateState({
+      allocation: { ...allocation, armData: newArmData }
     });
   };
   const handleFileChange = (e) => {
@@ -17462,7 +17574,7 @@ const Sidebar = ({
             className: "full-width input-sm",
             placeholder: "Label (e.g. Residents)",
             value: enrollment.label,
-            onChange: (e) => updateState({ enrollment: { ...enrollment, label: e.target.value } })
+            onChange: (e) => handleEnrollmentLabelChange(e.target.value)
           }
         ) }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "input-field", children: [
@@ -17472,15 +17584,42 @@ const Sidebar = ({
             {
               type: "number",
               value: enrollment.count,
-              onChange: (e) => updateState({ enrollment: { ...enrollment, count: parseInt(e.target.value) || 0 } })
+              onChange: (e) => handleEnrollmentCountChange(e.target.value)
             }
           )
         ] })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "control-group", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Excluded" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "input-field", style: { flexDirection: "row", alignItems: "center", marginBottom: "0.75rem" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              type: "checkbox",
+              id: "cb-show-center-boxes",
+              checked: showCenterCohortBoxes !== false,
+              onChange: (e) => updateState({ showCenterCohortBoxes: e.target.checked }),
+              style: { width: "auto", marginRight: "0.5rem" }
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { htmlFor: "cb-show-center-boxes", style: { fontWeight: "normal", margin: 0, fontSize: "0.85rem" }, children: "Show Remaining Cohort in Center Column" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "input-field", style: { marginBottom: "1rem" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { style: { fontSize: "0.8rem" }, children: "Exclusion Side Placement" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "select",
+            {
+              value: exclusionLayout || "alternating",
+              onChange: (e) => updateState({ exclusionLayout: e.target.value }),
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "alternating", children: "Alternating (Both Sides)" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "right", children: "Right Side Only" })
+              ]
+            }
+          )
+        ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { id: "exclusion-list", children: [
-          exclusions.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "exclusion-header exclusion-item", style: { gridTemplateColumns: "1fr 80px 80px 32px", marginBottom: "0.25rem", paddingBottom: "0.25rem", borderBottom: "1px solid var(--border-color)" }, children: [
+          exclusions.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "exclusion-header exclusion-item", style: { gridTemplateColumns: "1fr 75px 75px 28px", marginBottom: "0.25rem", paddingBottom: "0.25rem", borderBottom: "1px solid var(--border-color)" }, children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: "0.75rem", color: "var(--text-secondary)" }, children: "Reason" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: "0.75rem", color: "var(--text-secondary)", textAlign: "center" }, children: "Excluded" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: "0.75rem", color: "var(--text-secondary)", textAlign: "center" }, children: "Remaining" }),
@@ -17488,53 +17627,69 @@ const Sidebar = ({
           ] }),
           (() => {
             let currentRemaining = parseInt(enrollment.count) || 0;
-            return exclusions.map((ex) => {
+            return exclusions.map((ex, index) => {
+              const isLastEx = index === exclusions.length - 1;
               const remainingBeforeThis = currentRemaining;
               const remainingAfterThis = currentRemaining - (parseInt(ex.count) || 0);
               currentRemaining = remainingAfterThis;
-              return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "exclusion-item", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(
+              const cohortVal = isLastEx ? randomizedLabel !== void 0 ? randomizedLabel : ex.cohortLabel || "" : ex.cohortLabel || "";
+              return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "exclusion-card", style: { marginBottom: "0.5rem", paddingBottom: "0.5rem", borderBottom: "1px dashed var(--border-color)" }, children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "exclusion-item", style: { gridTemplateColumns: "1fr 75px 75px 28px" }, children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "input",
+                    {
+                      type: "text",
+                      value: ex.reason,
+                      placeholder: "Reason",
+                      title: "Reason",
+                      onChange: (e) => updateExclusion(ex.id, "reason", e.target.value)
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "input",
+                    {
+                      type: "number",
+                      value: ex.count,
+                      placeholder: "0",
+                      title: `Number Excluded (Remaining before this step: ${formatNumber(remainingBeforeThis)})`,
+                      onChange: (e) => updateExclusion(ex.id, "count", parseInt(e.target.value) || 0)
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "input",
+                    {
+                      type: "number",
+                      value: remainingAfterThis,
+                      placeholder: "0",
+                      title: "Remaining after this exclusion",
+                      onChange: (e) => {
+                        const newRemaining = parseInt(e.target.value) || 0;
+                        const newExcluded = remainingBeforeThis - newRemaining;
+                        updateExclusion(ex.id, "count", Math.max(0, newExcluded));
+                      }
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      className: "del-btn",
+                      title: "Remove",
+                      onClick: () => removeExclusion(ex.id),
+                      children: "×"
+                    }
+                  )
+                ] }),
+                showCenterCohortBoxes !== false && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { marginTop: "0.35rem" }, children: /* @__PURE__ */ jsxRuntimeExports.jsx(
                   "input",
                   {
                     type: "text",
-                    value: ex.reason,
-                    placeholder: "Reason",
-                    onChange: (e) => updateExclusion(ex.id, "reason", e.target.value)
+                    value: cohortVal,
+                    placeholder: isLastEx ? "Final Center Box Label (e.g. Valid Survival Data / Randomized)" : "Center Box Label (Optional, e.g. Diagnosis year ≥ 2018)",
+                    title: isLastEx ? "Final Center Box Label (linked with Allocation label)" : "Center Box Label",
+                    style: { fontSize: "0.75rem", padding: "0.35rem" },
+                    onChange: (e) => updateExclusion(ex.id, "cohortLabel", e.target.value)
                   }
-                ),
-                /* @__PURE__ */ jsxRuntimeExports.jsx(
-                  "input",
-                  {
-                    type: "number",
-                    value: ex.count,
-                    placeholder: "0",
-                    title: `Number Excluded (Remaining before this step: ${formatNumber(remainingBeforeThis)})`,
-                    onChange: (e) => updateExclusion(ex.id, "count", parseInt(e.target.value) || 0)
-                  }
-                ),
-                /* @__PURE__ */ jsxRuntimeExports.jsx(
-                  "input",
-                  {
-                    type: "number",
-                    value: remainingAfterThis,
-                    placeholder: "0",
-                    title: "Remaining after this exclusion",
-                    onChange: (e) => {
-                      const newRemaining = parseInt(e.target.value) || 0;
-                      const newExcluded = remainingBeforeThis - newRemaining;
-                      updateExclusion(ex.id, "count", Math.max(0, newExcluded));
-                    }
-                  }
-                ),
-                /* @__PURE__ */ jsxRuntimeExports.jsx(
-                  "button",
-                  {
-                    className: "del-btn",
-                    title: "Remove",
-                    onClick: () => removeExclusion(ex.id),
-                    children: "×"
-                  }
-                )
+                ) })
               ] }, ex.id);
             });
           })()
@@ -17550,23 +17705,72 @@ const Sidebar = ({
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "input-field", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("label", { children: "Number of Arms" }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("select", { value: allocation.arms, onChange: handleArmCountChange, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "0", children: "None (Single Cohort / Observational)" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "2", children: "2 Groups" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "3", children: "3 Groups" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "4", children: "4 Groups" })
           ] })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "input-field", style: { flexDirection: "row", alignItems: "center", marginTop: "1rem" }, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "input-field", style: { marginTop: "0.75rem" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { children: "Randomized / Final Cohort Label" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             "input",
             {
-              type: "checkbox",
-              id: "cb-show-followup",
-              checked: showFollowUpAnalysis,
-              onChange: (e) => updateState({ showFollowUpAnalysis: e.target.checked }),
-              style: { width: "auto", marginRight: "0.5rem" }
+              type: "text",
+              value: randomizedLabel !== void 0 ? randomizedLabel : exclusions[exclusions.length - 1]?.cohortLabel || "Randomized",
+              placeholder: "e.g. Randomized or Final analytic cohort",
+              onChange: (e) => handleRandomizedLabelChange(e.target.value)
+            }
+          )
+        ] }),
+        allocation.arms > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "allocation-arms-list", style: { marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { style: { fontSize: "0.75rem", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase" }, children: "Arm Details (Label & Count)" }),
+          allocation.armData.slice(0, allocation.arms).map((arm, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "grid", gridTemplateColumns: "1fr 85px", gap: "0.4rem", alignItems: "center" }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                type: "text",
+                value: arm.label,
+                placeholder: `Group ${index + 1} Label`,
+                title: `Group ${index + 1} Label`,
+                onChange: (e) => updateArm(arm.id, "label", e.target.value)
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                type: "number",
+                value: arm.count !== void 0 ? arm.count : Math.floor(randomizedCount / allocation.arms),
+                placeholder: "0",
+                title: `Group ${index + 1} Count`,
+                onChange: (e) => updateArm(arm.id, "count", parseInt(e.target.value) || 0)
+              }
+            )
+          ] }, arm.id)),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              type: "button",
+              className: "btn-secondary",
+              style: { fontSize: "0.75rem", padding: "0.35rem 0.5rem", marginTop: "0.25rem" },
+              onClick: handleAutoSplitArms,
+              title: "Divide the randomized cohort evenly among arms",
+              children: "⚡ Auto-Split Arms Evenly"
             }
           ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { htmlFor: "cb-show-followup", style: { fontWeight: "normal", margin: 0 }, children: "Show Follow-Up & Analysis" })
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "input-field", style: { flexDirection: "row", alignItems: "center", marginTop: "0.75rem" }, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                type: "checkbox",
+                id: "cb-show-followup",
+                checked: showFollowUpAnalysis,
+                onChange: (e) => updateState({ showFollowUpAnalysis: e.target.checked }),
+                style: { width: "auto", marginRight: "0.5rem" }
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { htmlFor: "cb-show-followup", style: { fontWeight: "normal", margin: 0, fontSize: "0.85rem" }, children: "Show Follow-Up & Analysis" })
+          ] })
         ] })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "control-group", children: [
@@ -17599,11 +17803,41 @@ const Sidebar = ({
           )
         ] })
       ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "control-group", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { children: "Export Diagram" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "input-field", style: { marginBottom: "0.75rem" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { style: { fontSize: "0.8rem", fontWeight: 600 }, children: "Image Resolution (DPI)" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "select",
+            {
+              value: exportDpi,
+              onChange: (e) => setExportDpi(e.target.value),
+              style: { fontSize: "0.85rem" },
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "300", children: "300 DPI (High Res - Journal / Print Default)" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "600", children: "600 DPI (Ultra High Res - Publication)" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "150", children: "150 DPI (Medium - Slides / Web)" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "96", children: "96 DPI (Standard - Screen)" })
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: "0.72rem", color: "var(--text-secondary)" }, children: "High resolution (300 DPI) prevents blurriness for journal submissions." })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "actions", style: { display: "flex", flexDirection: "column", gap: "0.5rem" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-primary", onClick: () => handleExport("svg"), children: "Export to SVG (Vector)" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "btn-secondary", onClick: () => handleExport("png", exportDpi), children: [
+            "Export to PNG (",
+            exportDpi,
+            " DPI)"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "btn-secondary", onClick: () => handleExport("jpg", exportDpi), children: [
+            "Export to JPG (",
+            exportDpi,
+            " DPI)"
+          ] })
+        ] })
+      ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "actions", style: { display: "flex", flexDirection: "column", gap: "0.5rem" }, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-primary", onClick: () => handleExport("svg"), children: "Export to SVG" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary", onClick: () => handleExport("png"), children: "Export to PNG" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary", onClick: () => handleExport("jpg"), children: "Export to JPG" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("hr", { style: { margin: "0.5rem 0", borderColor: "var(--border-color)" } }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary", onClick: handleSaveState, children: "Save Project" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary", onClick: () => fileInputRef.current?.click(), children: "Load Project" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -17674,9 +17908,17 @@ const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) => {
   const mainFlowRef = reactExports.useRef(null);
   let currentCount = state.enrollment.count;
   const initialCount = currentCount;
+  const isRightOnly = state.exclusionLayout === "right";
+  const showCenterBoxes = state.showCenterCohortBoxes !== false;
   const exclusionsData = state.exclusions.map((ex, i) => {
-    currentCount -= parseInt(ex.count) || 0;
-    return { ...ex, side: i % 2 === 0 ? "right" : "left" };
+    const excludedCount = parseInt(ex.count) || 0;
+    currentCount -= excludedCount;
+    const side = isRightOnly ? "right" : i % 2 === 0 ? "right" : "left";
+    return {
+      ...ex,
+      side,
+      remaining: currentCount
+    };
   });
   const randomizedCount = currentCount;
   reactExports.useLayoutEffect(() => {
@@ -17701,43 +17943,88 @@ const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) => {
       };
       const assessedBox = document.getElementById("enrollment-box");
       if (!assessedBox) return;
-      let lastY = getPos(assessedBox).bottom;
       const mainX = getPos(assessedBox).x;
-      exclusionsData.forEach((ex) => {
-        const box = document.getElementById(`exclusion-${ex.id}`);
-        if (!box) return;
-        const boxRect = getPos(box);
-        const jointY = boxRect.y;
-        addLine(mainX, lastY, mainX, jointY);
-        if (ex.side === "right") {
-          addLine(mainX, jointY, boxRect.left, jointY, true);
+      if (showCenterBoxes) {
+        const N = exclusionsData.length;
+        if (N === 0) {
+          const randBox = document.getElementById("randomized-box");
+          if (randBox) {
+            const topP = getPos(assessedBox);
+            const botP = getPos(randBox);
+            addLine(mainX, topP.bottom, mainX, botP.top - 5, true);
+          }
         } else {
-          addLine(mainX, jointY, boxRect.right, jointY, true);
-        }
-        lastY = jointY;
-      });
-      const randomizedBox = document.getElementById("randomized-box");
-      if (randomizedBox) {
-        const randRect = getPos(randomizedBox);
-        addLine(mainX, lastY, mainX, randRect.top - 5, true);
-        const forkY = randRect.bottom + 20;
-        addLine(mainX, randRect.bottom, mainX, forkY);
-        const armCols = Array.from(document.querySelectorAll(".arm-col"));
-        if (armCols.length > 0) {
-          const firstRect = getPos(armCols[0].children[0]);
-          const lastRect = getPos(armCols[armCols.length - 1].children[0]);
-          addLine(firstRect.x, forkY, lastRect.x, forkY);
-          armCols.forEach((col) => {
-            const boxes = Array.from(col.querySelectorAll(".dia-box"));
-            if (boxes.length === 0) return;
-            const bPos = getPos(boxes[0]);
-            addLine(bPos.x, forkY, bPos.x, bPos.top - 5, true);
-            for (let i = 0; i < boxes.length - 1; i++) {
-              const topBox = getPos(boxes[i]);
-              const botBox = getPos(boxes[i + 1]);
-              addLine(topBox.x, topBox.bottom, botBox.x, botBox.top - 5, true);
+          for (let i = 0; i < N; i++) {
+            const ex = exclusionsData[i];
+            const topId = i === 0 ? "enrollment-box" : `cohort-step-${exclusionsData[i - 1].id}`;
+            const botId = i === N - 1 ? "randomized-box" : `cohort-step-${ex.id}`;
+            const topEl = document.getElementById(topId);
+            const botEl = document.getElementById(botId);
+            const exEl = document.getElementById(`exclusion-${ex.id}`);
+            if (!topEl || !botEl || !exEl) continue;
+            const topP = getPos(topEl);
+            const botP = getPos(botEl);
+            const exP = getPos(exEl);
+            const jointY = exP.y;
+            addLine(mainX, topP.bottom, mainX, jointY);
+            if (ex.side === "right") {
+              addLine(mainX, jointY, exP.left, jointY, true);
+            } else {
+              addLine(mainX, jointY, exP.right, jointY, true);
             }
-          });
+            addLine(mainX, jointY, mainX, botP.top - 5, true);
+          }
+        }
+      } else {
+        let lastY = getPos(assessedBox).bottom;
+        exclusionsData.forEach((ex) => {
+          const box = document.getElementById(`exclusion-${ex.id}`);
+          if (!box) return;
+          const boxRect = getPos(box);
+          const jointY = boxRect.y;
+          addLine(mainX, lastY, mainX, jointY);
+          if (ex.side === "right") {
+            addLine(mainX, jointY, boxRect.left, jointY, true);
+          } else {
+            addLine(mainX, jointY, boxRect.right, jointY, true);
+          }
+          lastY = jointY;
+        });
+        const randomizedBox = document.getElementById("randomized-box");
+        if (randomizedBox) {
+          const randRect = getPos(randomizedBox);
+          addLine(mainX, lastY, mainX, randRect.top - 5, true);
+        }
+      }
+      if (state.allocation.arms > 0) {
+        const randomizedBox = document.getElementById("randomized-box");
+        if (randomizedBox) {
+          const randRect = getPos(randomizedBox);
+          const forkY = randRect.bottom + 20;
+          addLine(mainX, randRect.bottom, mainX, forkY);
+          const armCols = Array.from(document.querySelectorAll(".arm-col"));
+          if (armCols.length > 0) {
+            const firstRect = getPos(armCols[0].children[0]);
+            const lastRect = getPos(armCols[armCols.length - 1].children[0]);
+            if (firstRect && lastRect) {
+              addLine(firstRect.x, forkY, lastRect.x, forkY);
+              armCols.forEach((col) => {
+                const boxes = Array.from(col.querySelectorAll(".dia-box"));
+                if (boxes.length === 0) return;
+                const bPos = getPos(boxes[0]);
+                if (bPos) {
+                  addLine(bPos.x, forkY, bPos.x, bPos.top - 5, true);
+                  for (let i = 0; i < boxes.length - 1; i++) {
+                    const topBox = getPos(boxes[i]);
+                    const botBox = getPos(boxes[i + 1]);
+                    if (topBox && botBox) {
+                      addLine(topBox.x, topBox.bottom, botBox.x, botBox.top - 5, true);
+                    }
+                  }
+                }
+              });
+            }
+          }
         }
       }
       setLines(newLines);
@@ -17802,13 +18089,44 @@ const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) => {
           onTextChange: onOverrideText
         }
       ) }),
-      exclusionsData.map((ex) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "joint-row", style: { zIndex: 2 }, children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+      showCenterBoxes ? exclusionsData.map((ex, i) => {
+        const isLast = i === exclusionsData.length - 1;
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs(React.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "joint-row", style: { zIndex: 2 }, children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+            DiagramBox,
+            {
+              id: `exclusion-${ex.id}`,
+              isHtml: true,
+              title: renderText(`exclusion-${ex.id}`, "title", state.exclusionLabel || "Excluded"),
+              content: renderText(`exclusion-${ex.id}`, "content", `${ex.reason}<br>(n=${formatNumber(ex.count)})`),
+              onTextChange: onOverrideText,
+              style: {
+                position: "absolute",
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: "210px",
+                fontSize: "0.85rem",
+                ...ex.side === "right" ? { left: "calc(50% + 180px)", textAlign: "left" } : { right: "calc(50% + 180px)", textAlign: "right" }
+              }
+            }
+          ) }, `anchor-${ex.id}`),
+          !isLast && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "step-node", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+            DiagramBox,
+            {
+              id: `cohort-step-${ex.id}`,
+              title: renderText(`cohort-step-${ex.id}`, "title", ex.cohortLabel || "Remaining Cohort"),
+              content: renderText(`cohort-step-${ex.id}`, "content", `Remaining: (n=${formatNumber(ex.remaining)})`),
+              onTextChange: onOverrideText
+            }
+          ) }, `cohort-${ex.id}`)
+        ] }, ex.id);
+      }) : exclusionsData.map((ex) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "joint-row", style: { zIndex: 2 }, children: /* @__PURE__ */ jsxRuntimeExports.jsx(
         DiagramBox,
         {
           id: `exclusion-${ex.id}`,
           isHtml: true,
-          title: renderText(`exclusion-${ex.id}`, "title", ""),
-          content: renderText(`exclusion-${ex.id}`, "content", `${ex.reason} (n=${formatNumber(ex.count)})`),
+          title: renderText(`exclusion-${ex.id}`, "title", state.exclusionLabel || "Excluded"),
+          content: renderText(`exclusion-${ex.id}`, "content", `${ex.reason}<br>(n=${formatNumber(ex.count)})`),
           onTextChange: onOverrideText,
           style: {
             position: "absolute",
@@ -17820,24 +18138,28 @@ const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) => {
           }
         }
       ) }, ex.id)),
-      /* @__PURE__ */ jsxRuntimeExports.jsx(
-        DiagramBox,
-        {
-          id: "randomized-box",
-          title: renderText("randomized-box", "title", state.randomizedLabel),
-          content: renderText("randomized-box", "content", `(n=${formatNumber(randomizedCount)})`),
-          onTextChange: onOverrideText
-        }
-      ),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { display: "flex", justifyContent: "space-around", width: "100%", gap: "2rem", marginTop: "40px", zIndex: 2 }, children: state.allocation.armData.map((arm) => {
-        const count = Math.floor(randomizedCount / state.allocation.arms);
+      (() => {
+        const lastExclusion = exclusionsData.length > 0 ? exclusionsData[exclusionsData.length - 1] : null;
+        const finalBoxTitle = showCenterBoxes && lastExclusion?.cohortLabel ? lastExclusion.cohortLabel : state.randomizedLabel !== void 0 ? state.randomizedLabel : "Randomized";
+        return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "step-node", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+          DiagramBox,
+          {
+            id: "randomized-box",
+            title: renderText("randomized-box", "title", finalBoxTitle),
+            content: renderText("randomized-box", "content", `(n=${formatNumber(randomizedCount)})`),
+            onTextChange: onOverrideText
+          }
+        ) });
+      })(),
+      state.allocation.arms > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { display: "flex", justifyContent: "space-around", width: "100%", gap: "2rem", marginTop: "40px", zIndex: 2 }, children: state.allocation.armData.slice(0, state.allocation.arms).map((arm) => {
+        const armCount = arm.count !== void 0 && arm.count !== null && arm.count !== "" ? arm.count : Math.floor(randomizedCount / state.allocation.arms);
         return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "arm-col", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             DiagramBox,
             {
               id: `arm-${arm.id}`,
               title: renderText(`arm-${arm.id}`, "title", arm.label),
-              content: renderText(`arm-${arm.id}`, "content", `(n=${formatNumber(count)})`),
+              content: renderText(`arm-${arm.id}`, "content", `(n=${formatNumber(armCount)})`),
               onTextChange: onOverrideText
             }
           ),
@@ -17857,7 +18179,7 @@ const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) => {
               {
                 id: `analysis-${arm.id}`,
                 title: renderText(`analysis-${arm.id}`, "title", state.analysis.label),
-                content: renderText(`analysis-${arm.id}`, "content", `${state.analysis.analysedLabel} (n=${formatNumber(count)})`),
+                content: renderText(`analysis-${arm.id}`, "content", `${state.analysis.analysedLabel} (n=${formatNumber(armCount)})`),
                 onTextChange: onOverrideText
               }
             )
@@ -25688,62 +26010,231 @@ var parseBackgroundColor = function (context, element, backgroundColorOverride) 
         : defaultBackgroundColor;
 };
 
+/**
+ * Export the CONSORT diagram as a pure, native SVG vector file.
+ * Avoids <foreignObject> so that it opens cleanly and properly aligned in
+ * Adobe Illustrator, Inkscape, PowerPoint, Word, and web browsers.
+ */
 const downloadSvg = (diagramContainer, theme, font) => {
     if (!diagramContainer) return;
 
-    const w = diagramContainer.scrollWidth + 50;
-    const h = diagramContainer.scrollHeight + 50;
+    const containerRect = diagramContainer.getBoundingClientRect();
+    const w = Math.round(containerRect.width);
+    const h = Math.round(containerRect.height);
+
+    const containerStyle = window.getComputedStyle(diagramContainer);
+    let bgColor = theme === 'dark' ? '#1e293b' : (containerStyle.backgroundColor || '#ffffff');
+    if (bgColor === 'rgba(0, 0, 0, 0)' || !bgColor) {
+        bgColor = theme === 'dark' ? '#1e293b' : '#ffffff';
+    }
+
+    let arrowColor = '#000000';
+    if (theme === 'dark') arrowColor = '#f1f5f9';
+    if (theme === 'pastel') arrowColor = '#db2777';
+    if (theme === 'emerald') arrowColor = '#064e3b';
+    if (theme === 'minimalist') arrowColor = '#9ca3af';
 
     const exportSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     exportSvg.setAttribute("width", w);
     exportSvg.setAttribute("height", h);
+    exportSvg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     exportSvg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
 
-    const fontStyle = font && font !== 'default'
-        ? `.dia-box, .dia-label, .dia-count, .consort-diagram { font-family: ${font} !important; }`
-        : '';
-
-    const style = document.createElement("style");
-    style.textContent = `
-        @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Merriweather:wght@400;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Roboto:wght@400;500;700&display=swap');
-        .dia-box { border: 2px solid black; background: white; padding: 10px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; }
-        .dia-label { font-weight: bold; margin-bottom: 5px; outline: none; border-bottom: 1px dashed transparent; }
-        .theme-modern .dia-box { border: 1px solid #cbd5e1; border-left: 4px solid #2563eb; border-radius: 8px; font-family: 'Inter', sans-serif; background: white; color: #334155; }
-        .theme-dark .dia-box { background: #334155; color: #f1f5f9; border: 1px solid #475569; font-family: 'Inter', sans-serif; border-radius: 6px; }
-        .theme-classic { font-family: 'Times New Roman', serif; background: white; color: black; }
-        .main-flow { display: flex; flex-direction: column; align-items: center; gap: 60px; width: 100%; position: relative; }
-        .joint-row { display: flex; justify-content: center; position: relative; width: 100%; height: 0; }
-        .step-node { display: flex; justify-content: center; position: relative;}
-        .arm-col { display: flex; flex-direction: column; align-items: center; gap: 40px; }
-        .theme-modern .dia-label { color: #2563eb; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }
-        .theme-dark .dia-label { color: #93c5fd; }
-        .theme-dark .dia-count { color: #e2e8f0; }
-        ${fontStyle}
+    // Defs: Webfonts and arrowhead marker
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    const styleEl = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    styleEl.textContent = `
+        @import url('${GOOGLE_FONTS_URL}');
     `;
-    exportSvg.appendChild(style);
+    defs.appendChild(styleEl);
 
-    const foreignObj = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
-    foreignObj.setAttribute("width", "100%");
-    foreignObj.setAttribute("height", "100%");
+    // Arrowhead marker
+    const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+    marker.setAttribute("id", "arrowhead-export");
+    marker.setAttribute("markerWidth", "10");
+    marker.setAttribute("markerHeight", "7");
+    marker.setAttribute("refX", "9");
+    marker.setAttribute("refY", "3.5");
+    marker.setAttribute("orient", "auto");
+    const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+    polygon.setAttribute("points", "0 0, 10 3.5, 0 7");
+    polygon.setAttribute("fill", arrowColor);
+    marker.appendChild(polygon);
+    defs.appendChild(marker);
 
-    const htmlWrap = document.createElement("div");
-    htmlWrap.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
-    if (theme) htmlWrap.className = `theme-${theme}`;
+    exportSvg.appendChild(defs);
 
-    const mainFlow = diagramContainer.querySelector('.main-flow');
-    if (mainFlow) {
-        htmlWrap.appendChild(mainFlow.cloneNode(true));
-    }
+    // Background rect
+    const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    bgRect.setAttribute("width", w);
+    bgRect.setAttribute("height", h);
+    bgRect.setAttribute("fill", bgColor);
+    exportSvg.appendChild(bgRect);
 
-    foreignObj.appendChild(htmlWrap);
-    exportSvg.appendChild(foreignObj);
-
+    // 1. Connection lines (Paths)
     const originalSvg = diagramContainer.querySelector('svg.diagram-lines');
     if (originalSvg) {
+        // Accurately translate lines by the exact offset of svg.diagram-lines relative to diagramContainer
+        const svgRect = originalSvg.getBoundingClientRect();
+        const linesOffsetX = Math.round(svgRect.left - containerRect.left);
+        const linesOffsetY = Math.round(svgRect.top - containerRect.top);
+
         const linesGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        linesGroup.innerHTML = originalSvg.innerHTML;
+        linesGroup.setAttribute("class", "diagram-lines-group");
+        linesGroup.setAttribute("transform", `translate(${linesOffsetX}, ${linesOffsetY})`);
+
+        const paths = originalSvg.querySelectorAll('path');
+        paths.forEach(p => {
+            const d = p.getAttribute("d");
+            if (!d) return;
+            const newPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            newPath.setAttribute("d", d);
+            newPath.setAttribute("stroke", p.getAttribute("stroke") || arrowColor);
+            newPath.setAttribute("stroke-width", p.getAttribute("stroke-width") || "2");
+            newPath.setAttribute("fill", "none");
+            if (p.getAttribute("marker-end")) {
+                newPath.setAttribute("marker-end", "url(#arrowhead-export)");
+            }
+            linesGroup.appendChild(newPath);
+        });
         exportSvg.appendChild(linesGroup);
     }
+
+    // 2. Boxes (Native SVG rects and text)
+    const boxesGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    boxesGroup.setAttribute("class", "diagram-boxes-group");
+
+    const boxes = diagramContainer.querySelectorAll('.dia-box');
+    boxes.forEach(box => {
+        const rect = box.getBoundingClientRect();
+        const boxX = Math.round(rect.left - containerRect.left);
+        const boxY = Math.round(rect.top - containerRect.top);
+        const boxW = Math.round(rect.width);
+        const boxH = Math.round(rect.height);
+
+        const computed = window.getComputedStyle(box);
+        const boxBg = computed.backgroundColor || '#ffffff';
+        const borderColor = computed.borderTopColor || '#000000';
+        const borderWidth = parseFloat(computed.borderTopWidth) || 1;
+        const borderRadius = parseFloat(computed.borderRadius) || 0;
+        const paddingLeft = parseFloat(computed.paddingLeft) || 16;
+        const paddingRight = parseFloat(computed.paddingRight) || 16;
+        const textAlign = computed.textAlign || 'center';
+
+        const boxG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        boxG.setAttribute("class", "diagram-box");
+
+        // Main box rect
+        const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        r.setAttribute("x", boxX);
+        r.setAttribute("y", boxY);
+        r.setAttribute("width", boxW);
+        r.setAttribute("height", boxH);
+        r.setAttribute("rx", borderRadius);
+        r.setAttribute("ry", borderRadius);
+        r.setAttribute("fill", boxBg);
+        r.setAttribute("stroke", borderColor);
+        r.setAttribute("stroke-width", borderWidth);
+        boxG.appendChild(r);
+
+        // Accent border on left (e.g. Modern theme blue bar)
+        const borderLeftWidth = parseFloat(computed.borderLeftWidth) || 0;
+        const borderLeftColor = computed.borderLeftColor;
+        if (borderLeftWidth >= 3 && borderLeftColor && borderLeftColor !== borderColor) {
+            const leftBar = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            leftBar.setAttribute("x", boxX);
+            leftBar.setAttribute("y", boxY);
+            leftBar.setAttribute("width", borderLeftWidth);
+            leftBar.setAttribute("height", boxH);
+            leftBar.setAttribute("rx", Math.min(borderRadius, borderLeftWidth / 2));
+            leftBar.setAttribute("fill", borderLeftColor);
+            boxG.appendChild(leftBar);
+        }
+
+        // Determine text anchor and horizontal position based on text alignment
+        let textAnchor = 'middle';
+        let textX = boxX + boxW / 2;
+        if (textAlign === 'left' || textAlign === 'start') {
+            textAnchor = 'start';
+            textX = boxX + paddingLeft;
+        } else if (textAlign === 'right' || textAlign === 'end') {
+            textAnchor = 'end';
+            textX = boxX + boxW - paddingRight;
+        }
+
+        // Title / Label text
+        const labelEl = box.querySelector('.dia-label');
+        let labelLines = [];
+        let lblStyle = null;
+        if (labelEl) {
+            lblStyle = window.getComputedStyle(labelEl);
+            let rawTitle = labelEl.innerText.trim();
+            if (lblStyle.textTransform === 'uppercase') {
+                rawTitle = rawTitle.toUpperCase();
+            }
+            labelLines = rawTitle.split('\n').map(l => l.trim()).filter(Boolean);
+        }
+
+        // Content / Count text
+        const countEl = box.querySelector('.dia-count');
+        let countLines = [];
+        let cntStyle = null;
+        if (countEl) {
+            cntStyle = window.getComputedStyle(countEl);
+            countLines = countEl.innerText
+                .split('\n')
+                .map(l => l.trim())
+                .filter(Boolean);
+        }
+
+        // Compute vertical layout for text inside box
+        const titleFontSize = lblStyle ? (parseFloat(lblStyle.fontSize) || 12) : 0;
+        const titleLineHeight = titleFontSize > 0 ? Math.round(titleFontSize * 1.3) : 0;
+        const countFontSize = cntStyle ? (parseFloat(cntStyle.fontSize) || 14) : 14;
+        const countLineHeight = Math.round(countFontSize * 1.35);
+
+        const labelGap = (labelLines.length > 0 && countLines.length > 0) ? 6 : 0;
+        const totalTextHeight = (labelLines.length * titleLineHeight) + labelGap + (countLines.length * countLineHeight);
+
+        let currentY = boxY + Math.max(10, Math.round((boxH - totalTextHeight) / 2)) + Math.round((labelLines.length > 0 ? titleFontSize : countFontSize) * 0.85);
+
+        if (labelLines.length > 0 && lblStyle) {
+            labelLines.forEach((line) => {
+                const textEl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                textEl.setAttribute("x", textX);
+                textEl.setAttribute("y", currentY);
+                textEl.setAttribute("text-anchor", textAnchor);
+                textEl.setAttribute("font-family", lblStyle.fontFamily || (font && font !== 'default' ? font : 'sans-serif'));
+                textEl.setAttribute("font-size", `${titleFontSize}px`);
+                textEl.setAttribute("font-weight", lblStyle.fontWeight || 'bold');
+                textEl.setAttribute("fill", lblStyle.color || '#000000');
+                textEl.textContent = line;
+                boxG.appendChild(textEl);
+                currentY += titleLineHeight;
+            });
+            currentY += labelGap;
+        }
+
+        if (countLines.length > 0 && cntStyle) {
+            countLines.forEach((line) => {
+                const textEl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                textEl.setAttribute("x", textX);
+                textEl.setAttribute("y", currentY);
+                textEl.setAttribute("text-anchor", textAnchor);
+                textEl.setAttribute("font-family", cntStyle.fontFamily || (font && font !== 'default' ? font : 'sans-serif'));
+                textEl.setAttribute("font-size", `${countFontSize}px`);
+                textEl.setAttribute("font-weight", cntStyle.fontWeight || 'normal');
+                textEl.setAttribute("fill", cntStyle.color || '#333333');
+                textEl.textContent = line;
+                boxG.appendChild(textEl);
+                currentY += countLineHeight;
+            });
+        }
+
+        boxesGroup.appendChild(boxG);
+    });
+
+    exportSvg.appendChild(boxesGroup);
 
     const s = new XMLSerializer();
     const str = s.serializeToString(exportSvg);
@@ -25759,17 +26250,28 @@ const downloadSvg = (diagramContainer, theme, font) => {
     URL.revokeObjectURL(url);
 };
 
-const downloadImage = (diagramContainer, theme, format) => {
+/**
+ * Export the diagram as high-resolution PNG or JPG with selectable DPI.
+ * Standard web is 96 DPI.
+ * 300 DPI (scale 3.125) is standard for scientific journals and publications.
+ * 600 DPI (scale 6.25) is ultra-high resolution for high-end print.
+ */
+const downloadImage = (diagramContainer, theme, format, dpi = 300) => {
     if (!diagramContainer) return;
+
+    const dpiNum = parseInt(dpi, 10) || 300;
+    // Scale factor relative to 96 DPI baseline
+    const scale = dpiNum / 96;
 
     html2canvas(diagramContainer, {
         backgroundColor: (theme === 'dark' ? '#1e293b' : '#ffffff'),
-        scale: 2,
+        scale: scale,
+        useCORS: true,
         logging: false
     }).then(canvas => {
         const link = document.createElement('a');
-        link.download = `consort-diagram.${format}`;
-        link.href = canvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`);
+        link.download = `consort-diagram-${dpiNum}dpi.${format}`;
+        link.href = canvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`, 0.98);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -25783,11 +26285,13 @@ const defaultState = {
   theme: "modern",
   font: "default",
   showFollowUpAnalysis: true,
+  showCenterCohortBoxes: true,
+  exclusionLayout: "alternating",
   enrollment: { label: "Assessed for eligibility", count: 135 },
   exclusionLabel: "Excluded",
   exclusions: [
-    { id: Date.now(), reason: "Not meeting inclusion criteria", count: 20 },
-    { id: Date.now() + 1, reason: "Declined to participate", count: 12 }
+    { id: Date.now(), reason: "Not meeting inclusion criteria", count: 20, cohortLabel: "" },
+    { id: Date.now() + 1, reason: "Declined to participate", count: 12, cohortLabel: "" }
   ],
   randomizedLabel: "Randomized",
   allocation: {
@@ -25837,11 +26341,25 @@ function App() {
       }
     }));
   };
-  const handleExport = (format) => {
+  const clearTextOverride = (id, key) => {
+    setTextOverrides((prev) => {
+      if (!prev[id]) return prev;
+      if (key) {
+        if (prev[id][key] === void 0) return prev;
+        const nextBox = { ...prev[id] };
+        delete nextBox[key];
+        return { ...prev, [id]: nextBox };
+      }
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+  };
+  const handleExport = (format, dpi = 300) => {
     if (format === "svg") {
       downloadSvg(diagramRef.current, state.theme, state.font);
     } else {
-      downloadImage(diagramRef.current, state.theme, format);
+      downloadImage(diagramRef.current, state.theme, format, dpi);
     }
   };
   const handleSaveState = () => {
@@ -25881,7 +26399,8 @@ function App() {
         updateState,
         handleExport,
         handleSaveState,
-        handleLoadState
+        handleLoadState,
+        clearTextOverride
       }
     ),
     /* @__PURE__ */ jsxRuntimeExports.jsx("main", { className: "preview-area", children: /* @__PURE__ */ jsxRuntimeExports.jsx(

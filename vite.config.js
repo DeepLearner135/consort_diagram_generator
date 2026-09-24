@@ -30,7 +30,7 @@ export default defineConfig({
                 const minutes = pad(now.getMinutes());
                 const seconds = pad(now.getSeconds());
                 const timestamp = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
-                const newName = `ConsortDiagramGenerator_${timestamp}.html`;
+                const newName = `${timestamp}_ConsortDiagramGenerator.html`;
 
                 const chunk = bundle[htmlKey];
                 chunk.fileName = newName;
@@ -42,7 +42,7 @@ export default defineConfig({
                     if (req.url === '/' || req.url === '/index.html') {
                         try {
                             const files = fs.readdirSync('dist');
-                            const htmlFiles = files.filter(f => f.startsWith('ConsortDiagramGenerator') && f.endsWith('.html'));
+                            const htmlFiles = files.filter(f => f.endsWith('.html') && f.includes('ConsortDiagramGenerator'));
                             if (htmlFiles.length > 0) {
                                 htmlFiles.sort().reverse();
                                 req.url = '/' + htmlFiles[0];

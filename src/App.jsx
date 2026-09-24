@@ -8,11 +8,13 @@ const defaultState = {
     theme: 'modern',
     font: 'default',
     showFollowUpAnalysis: true,
+    showCenterCohortBoxes: true,
+    exclusionLayout: 'alternating',
     enrollment: { label: "Assessed for eligibility", count: 135 },
     exclusionLabel: "Excluded",
     exclusions: [
-        { id: Date.now(), reason: "Not meeting inclusion criteria", count: 20 },
-        { id: Date.now() + 1, reason: "Declined to participate", count: 12 }
+        { id: Date.now(), reason: "Not meeting inclusion criteria", count: 20, cohortLabel: "" },
+        { id: Date.now() + 1, reason: "Declined to participate", count: 12, cohortLabel: "" }
     ],
     randomizedLabel: "Randomized",
     allocation: {
@@ -72,11 +74,26 @@ function App() {
         }));
     };
 
-    const handleExport = (format) => {
+    const clearTextOverride = (id, key) => {
+        setTextOverrides(prev => {
+            if (!prev[id]) return prev;
+            if (key) {
+                if (prev[id][key] === undefined) return prev;
+                const nextBox = { ...prev[id] };
+                delete nextBox[key];
+                return { ...prev, [id]: nextBox };
+            }
+            const copy = { ...prev };
+            delete copy[id];
+            return copy;
+        });
+    };
+
+    const handleExport = (format, dpi = 300) => {
         if (format === 'svg') {
             downloadSvg(diagramRef.current, state.theme, state.font);
         } else {
-            downloadImage(diagramRef.current, state.theme, format);
+            downloadImage(diagramRef.current, state.theme, format, dpi);
         }
     };
 
@@ -120,6 +137,7 @@ function App() {
                     handleExport={handleExport}
                     handleSaveState={handleSaveState}
                     handleLoadState={handleLoadState}
+                    clearTextOverride={clearTextOverride}
                 />
                 <main className="preview-area">
                     <div

@@ -11,9 +11,18 @@ export const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) 
     let currentCount = state.enrollment.count;
     const initialCount = currentCount;
 
+    const isRightOnly = state.exclusionLayout === 'right';
+    const showCenterBoxes = state.showCenterCohortBoxes !== false;
+
     const exclusionsData = state.exclusions.map((ex, i) => {
-        currentCount -= (parseInt(ex.count) || 0);
-        return { ...ex, side: i % 2 === 0 ? 'right' : 'left' };
+        const excludedCount = parseInt(ex.count) || 0;
+        currentCount -= excludedCount;
+        const side = isRightOnly ? 'right' : (i % 2 === 0 ? 'right' : 'left');
+        return {
+            ...ex,
+            side,
+            remaining: currentCount
+        };
     });
 
     const randomizedCount = currentCount;
@@ -45,56 +54,112 @@ export const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) 
             const assessedBox = document.getElementById('enrollment-box');
             if (!assessedBox) return; // Might not be mounted yet
 
-            let lastY = getPos(assessedBox).bottom;
             const mainX = getPos(assessedBox).x;
 
-            exclusionsData.forEach(ex => {
-                const box = document.getElementById(`exclusion-${ex.id}`);
-                if (!box) return;
-
-                const boxRect = getPos(box);
-                const jointY = boxRect.y;
-
-                addLine(mainX, lastY, mainX, jointY);
-
-                if (ex.side === 'right') {
-                    addLine(mainX, jointY, boxRect.left, jointY, true);
+            if (showCenterBoxes) {
+                const N = exclusionsData.length;
+                if (N === 0) {
+                    const randBox = document.getElementById('randomized-box');
+                    if (randBox) {
+                        const topP = getPos(assessedBox);
+                        const botP = getPos(randBox);
+                        addLine(mainX, topP.bottom, mainX, botP.top - 5, true);
+                    }
                 } else {
-                    addLine(mainX, jointY, boxRect.right, jointY, true);
-                }
+                    for (let i = 0; i < N; i++) {
+                        const ex = exclusionsData[i];
+                        const topId = i === 0 ? 'enrollment-box' : `cohort-step-${exclusionsData[i - 1].id}`;
+                        const botId = i === N - 1 ? 'randomized-box' : `cohort-step-${ex.id}`;
 
-                lastY = jointY;
-            });
+                        const topEl = document.getElementById(topId);
+                        const botEl = document.getElementById(botId);
+                        const exEl = document.getElementById(`exclusion-${ex.id}`);
 
-            const randomizedBox = document.getElementById('randomized-box');
-            if (randomizedBox) {
-                const randRect = getPos(randomizedBox);
-                addLine(mainX, lastY, mainX, randRect.top - 5, true);
+                        if (!topEl || !botEl || !exEl) continue;
 
-                const forkY = randRect.bottom + 20;
-                addLine(mainX, randRect.bottom, mainX, forkY);
+                        const topP = getPos(topEl);
+                        const botP = getPos(botEl);
+                        const exP = getPos(exEl);
 
-                // Allocation Area
-                const armCols = Array.from(document.querySelectorAll('.arm-col'));
-                if (armCols.length > 0) {
-                    const firstRect = getPos(armCols[0].children[0]);
-                    const lastRect = getPos(armCols[armCols.length - 1].children[0]);
+                        const jointY = exP.y;
 
-                    addLine(firstRect.x, forkY, lastRect.x, forkY);
+                        // Vertical line from top box down to joint
+                        addLine(mainX, topP.bottom, mainX, jointY);
 
-                    armCols.forEach(col => {
-                        const boxes = Array.from(col.querySelectorAll('.dia-box'));
-                        if (boxes.length === 0) return;
-
-                        const bPos = getPos(boxes[0]);
-                        addLine(bPos.x, forkY, bPos.x, bPos.top - 5, true);
-
-                        for (let i = 0; i < boxes.length - 1; i++) {
-                            const topBox = getPos(boxes[i]);
-                            const botBox = getPos(boxes[i + 1]);
-                            addLine(topBox.x, topBox.bottom, botBox.x, botBox.top - 5, true);
+                        // Horizontal branch to exclusion box with arrowhead
+                        if (ex.side === 'right') {
+                            addLine(mainX, jointY, exP.left, jointY, true);
+                        } else {
+                            addLine(mainX, jointY, exP.right, jointY, true);
                         }
-                    });
+
+                        // Vertical line from joint down into next center box with arrowhead
+                        addLine(mainX, jointY, mainX, botP.top - 5, true);
+                    }
+                }
+            } else {
+                let lastY = getPos(assessedBox).bottom;
+
+                exclusionsData.forEach(ex => {
+                    const box = document.getElementById(`exclusion-${ex.id}`);
+                    if (!box) return;
+
+                    const boxRect = getPos(box);
+                    const jointY = boxRect.y;
+
+                    addLine(mainX, lastY, mainX, jointY);
+
+                    if (ex.side === 'right') {
+                        addLine(mainX, jointY, boxRect.left, jointY, true);
+                    } else {
+                        addLine(mainX, jointY, boxRect.right, jointY, true);
+                    }
+
+                    lastY = jointY;
+                });
+
+                const randomizedBox = document.getElementById('randomized-box');
+                if (randomizedBox) {
+                    const randRect = getPos(randomizedBox);
+                    addLine(mainX, lastY, mainX, randRect.top - 5, true);
+                }
+            }
+
+            // Allocation Area
+            if (state.allocation.arms > 0) {
+                const randomizedBox = document.getElementById('randomized-box');
+                if (randomizedBox) {
+                    const randRect = getPos(randomizedBox);
+                    const forkY = randRect.bottom + 20;
+                    addLine(mainX, randRect.bottom, mainX, forkY);
+
+                    const armCols = Array.from(document.querySelectorAll('.arm-col'));
+                    if (armCols.length > 0) {
+                        const firstRect = getPos(armCols[0].children[0]);
+                        const lastRect = getPos(armCols[armCols.length - 1].children[0]);
+
+                        if (firstRect && lastRect) {
+                            addLine(firstRect.x, forkY, lastRect.x, forkY);
+
+                            armCols.forEach(col => {
+                                const boxes = Array.from(col.querySelectorAll('.dia-box'));
+                                if (boxes.length === 0) return;
+
+                                const bPos = getPos(boxes[0]);
+                                if (bPos) {
+                                    addLine(bPos.x, forkY, bPos.x, bPos.top - 5, true);
+
+                                    for (let i = 0; i < boxes.length - 1; i++) {
+                                        const topBox = getPos(boxes[i]);
+                                        const botBox = getPos(boxes[i + 1]);
+                                        if (topBox && botBox) {
+                                            addLine(topBox.x, topBox.bottom, botBox.x, botBox.top - 5, true);
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
                 }
             }
 
@@ -166,66 +231,115 @@ export const Diagram = ({ state, textOverrides, onOverrideText, containerRef }) 
                     />
                 </div>
 
-                {/* Exclusions */}
-                {exclusionsData.map(ex => (
-                    <div key={ex.id} className="joint-row" style={{ zIndex: 2 }}>
-                        <DiagramBox
-                            id={`exclusion-${ex.id}`}
-                            isHtml={true}
-                            title={renderText(`exclusion-${ex.id}`, 'title', "")}
-                            content={renderText(`exclusion-${ex.id}`, 'content', `${ex.reason} (n=${formatNumber(ex.count)})`)}
-                            onTextChange={onOverrideText}
-                            style={{
-                                position: 'absolute', top: '50%', transform: 'translateY(-50%)',
-                                width: '200px', fontSize: '0.85rem',
-                                ...(ex.side === 'right' ? { left: 'calc(50% + 40px)', textAlign: 'left' } : { right: 'calc(50% + 40px)', textAlign: 'right' })
-                            }}
-                        />
-                    </div>
-                ))}
+                {/* Exclusions & Center Cohort Boxes */}
+                {showCenterBoxes ? (
+                    exclusionsData.map((ex, i) => {
+                        const isLast = i === exclusionsData.length - 1;
+                        return (
+                            <React.Fragment key={ex.id}>
+                                <div key={`anchor-${ex.id}`} className="joint-row" style={{ zIndex: 2 }}>
+                                    <DiagramBox
+                                        id={`exclusion-${ex.id}`}
+                                        isHtml={true}
+                                        title={renderText(`exclusion-${ex.id}`, 'title', state.exclusionLabel || "Excluded")}
+                                        content={renderText(`exclusion-${ex.id}`, 'content', `${ex.reason}<br>(n=${formatNumber(ex.count)})`)}
+                                        onTextChange={onOverrideText}
+                                        style={{
+                                            position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+                                            width: '210px', fontSize: '0.85rem',
+                                            ...(ex.side === 'right' ? { left: 'calc(50% + 180px)', textAlign: 'left' } : { right: 'calc(50% + 180px)', textAlign: 'right' })
+                                        }}
+                                    />
+                                </div>
 
-                {/* Randomized */}
-                <DiagramBox
-                    id="randomized-box"
-                    title={renderText('randomized-box', 'title', state.randomizedLabel)}
-                    content={renderText('randomized-box', 'content', `(n=${formatNumber(randomizedCount)})`)}
-                    onTextChange={onOverrideText}
-                />
+                                {!isLast && (
+                                    <div className="step-node" key={`cohort-${ex.id}`}>
+                                        <DiagramBox
+                                            id={`cohort-step-${ex.id}`}
+                                            title={renderText(`cohort-step-${ex.id}`, 'title', ex.cohortLabel || "Remaining Cohort")}
+                                            content={renderText(`cohort-step-${ex.id}`, 'content', `Remaining: (n=${formatNumber(ex.remaining)})`)}
+                                            onTextChange={onOverrideText}
+                                        />
+                                    </div>
+                                )}
+                            </React.Fragment>
+                        );
+                    })
+                ) : (
+                    exclusionsData.map(ex => (
+                        <div key={ex.id} className="joint-row" style={{ zIndex: 2 }}>
+                            <DiagramBox
+                                id={`exclusion-${ex.id}`}
+                                isHtml={true}
+                                title={renderText(`exclusion-${ex.id}`, 'title', state.exclusionLabel || "Excluded")}
+                                content={renderText(`exclusion-${ex.id}`, 'content', `${ex.reason}<br>(n=${formatNumber(ex.count)})`)}
+                                onTextChange={onOverrideText}
+                                style={{
+                                    position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+                                    width: '200px', fontSize: '0.85rem',
+                                    ...(ex.side === 'right' ? { left: 'calc(50% + 40px)', textAlign: 'left' } : { right: 'calc(50% + 40px)', textAlign: 'right' })
+                                }}
+                            />
+                        </div>
+                    ))
+                )}
+
+                {/* Randomized / Final Cohort */}
+                {(() => {
+                    const lastExclusion = exclusionsData.length > 0 ? exclusionsData[exclusionsData.length - 1] : null;
+                    const finalBoxTitle = (showCenterBoxes && lastExclusion?.cohortLabel)
+                        ? lastExclusion.cohortLabel
+                        : (state.randomizedLabel !== undefined ? state.randomizedLabel : "Randomized");
+                    return (
+                        <div className="step-node">
+                            <DiagramBox
+                                id="randomized-box"
+                                title={renderText('randomized-box', 'title', finalBoxTitle)}
+                                content={renderText('randomized-box', 'content', `(n=${formatNumber(randomizedCount)})`)}
+                                onTextChange={onOverrideText}
+                            />
+                        </div>
+                    );
+                })()}
 
                 {/* Allocation */}
-                <div style={{ display: 'flex', justifyContent: 'space-around', width: '100%', gap: '2rem', marginTop: '40px', zIndex: 2 }}>
-                    {state.allocation.armData.map(arm => {
-                        const count = Math.floor(randomizedCount / state.allocation.arms);
-                        return (
-                            <div key={arm.id} className="arm-col">
-                                <DiagramBox
-                                    id={`arm-${arm.id}`}
-                                    title={renderText(`arm-${arm.id}`, 'title', arm.label)}
-                                    content={renderText(`arm-${arm.id}`, 'content', `(n=${formatNumber(count)})`)}
-                                    onTextChange={onOverrideText}
-                                />
+                {state.allocation.arms > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-around', width: '100%', gap: '2rem', marginTop: '40px', zIndex: 2 }}>
+                        {state.allocation.armData.slice(0, state.allocation.arms).map(arm => {
+                            const armCount = (arm.count !== undefined && arm.count !== null && arm.count !== '')
+                                ? arm.count
+                                : Math.floor(randomizedCount / state.allocation.arms);
+                            return (
+                                <div key={arm.id} className="arm-col">
+                                    <DiagramBox
+                                        id={`arm-${arm.id}`}
+                                        title={renderText(`arm-${arm.id}`, 'title', arm.label)}
+                                        content={renderText(`arm-${arm.id}`, 'content', `(n=${formatNumber(armCount)})`)}
+                                        onTextChange={onOverrideText}
+                                    />
 
-                                {state.showFollowUpAnalysis && (
-                                    <>
-                                        <DiagramBox
-                                            id={`followup-${arm.id}`}
-                                            isHtml={true}
-                                            title={renderText(`followup-${arm.id}`, 'title', state.followUp.label)}
-                                            content={renderText(`followup-${arm.id}`, 'content', `${state.followUp.lostLabel} (n=0)<br>${state.followUp.discontinuedLabel} (n=0)`)}
-                                            onTextChange={onOverrideText}
-                                        />
-                                        <DiagramBox
-                                            id={`analysis-${arm.id}`}
-                                            title={renderText(`analysis-${arm.id}`, 'title', state.analysis.label)}
-                                            content={renderText(`analysis-${arm.id}`, 'content', `${state.analysis.analysedLabel} (n=${formatNumber(count)})`)}
-                                            onTextChange={onOverrideText}
-                                        />
-                                    </>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
+                                    {state.showFollowUpAnalysis && (
+                                        <>
+                                            <DiagramBox
+                                                id={`followup-${arm.id}`}
+                                                isHtml={true}
+                                                title={renderText(`followup-${arm.id}`, 'title', state.followUp.label)}
+                                                content={renderText(`followup-${arm.id}`, 'content', `${state.followUp.lostLabel} (n=0)<br>${state.followUp.discontinuedLabel} (n=0)`)}
+                                                onTextChange={onOverrideText}
+                                            />
+                                            <DiagramBox
+                                                id={`analysis-${arm.id}`}
+                                                title={renderText(`analysis-${arm.id}`, 'title', state.analysis.label)}
+                                                content={renderText(`analysis-${arm.id}`, 'content', `${state.analysis.analysedLabel} (n=${formatNumber(armCount)})`)}
+                                                onTextChange={onOverrideText}
+                                            />
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
 
             </div>
         </div>
